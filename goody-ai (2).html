@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Goody.ai</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --cream:#fdf6f0;
+      --blush:#f2c4ce;
+      --rose:#e8a0b0;
+      --mauve:#c17c8f;
+      --sage:#b8c9b0;
+      --lavender:#d4c5e8;
+      --peach:#f5cba7;
+      --text:#3d2c35;
+      --text2:#7a5c68;
+      --white:#fff;
+      --card:#fffaf8;
+    }
+    body{background:var(--cream);font-family:'DM Sans',sans-serif;color:var(--text);min-height:100vh;overflow-x:hidden}
+    body::before{content:'';position:fixed;inset:0;background:
+      radial-gradient(ellipse 60% 40% at 10% 10%,rgba(242,196,206,.35) 0%,transparent 60%),
+      radial-gradient(ellipse 50% 50% at 90% 80%,rgba(212,197,232,.3) 0%,transparent 60%),
+      radial-gradient(ellipse 40% 40% at 50% 50%,rgba(245,203,167,.2) 0%,transparent 70%);
+      pointer-events:none;z-index:0}
+    #root{position:relative;z-index:1}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-thumb{background:var(--blush);border-radius:10px}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    @keyframes shimmer{0%{background-position:200% center}100%{background-position:-200% center}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes pulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
+    @keyframes waveIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+    .fadeUp{animation:fadeUp .6s ease both}
+    .float{animation:float 4s ease-in-out infinite}
+    input:focus{outline:none}
+    textarea:focus{outline:none}
+    button{cursor:pointer;font-family:'DM Sans',sans-serif}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+const VOICES = [
+  { id:'default', label:'🎀 Soft Girl', pitch:1.1, rate:0.95 },
+  { id:'calm',    label:'🌿 Calm',     pitch:0.95, rate:0.85 },
+  { id:'fun',     label:'✨ Fun',      pitch:1.3,  rate:1.1  },
+  { id:'deep',    label:'🎙️ Deep',    pitch:0.7,  rate:0.9  },
+  { id:'fast',    label:'⚡ Fast',     pitch:1.0,  rate:1.4  },
+];
+
+const MODES = [
+  { id:'simple',   label:'🌸 Simple',   desc:'Easy to understand' },
+  { id:'detailed', label:'📚 Detailed', desc:'In depth explanation' },
+  { id:'fun',      label:'🎉 Fun',      desc:'Casual and playful' },
+];
+
+const LANGS = [
+  { id:'en', label:'🇬🇧 English' },
+  { id:'hi', label:'🇮🇳 Hindi' },
+  { id:'ta', label:'🇮🇳 Tamil' },
+];
+
+const SUGGESTIONS = [
+  "What is artificial intelligence?",
+  "How does the human brain work?",
+  "What causes climate change?",
+  "How to stay motivated as a student?",
+  "What is quantum computing?",
+  "How to build healthy habits?",
+];
+
+const TAG_COLORS = [
+  {bg:'#fce4ec',text:'#c2185b'},
+  {bg:'#f3e5f5',text:'#7b1fa2'},
+  {bg:'#e8f5e9',text:'#2e7d32'},
+  {bg:'#fff3e0',text:'#e65100'},
+  {bg:'#e3f2fd',text:'#1565c0'},
+];
+
+function speak(text, voice) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text.replace(/[#*`]/g,''));
+  u.pitch = voice.pitch;
+  u.rate  = voice.rate;
+  window.speechSynthesis.speak(u);
+}
+
+function stopSpeak() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+function TypingDots() {
+  return (
+    <div style={{display:'flex',gap:5,alignItems:'center',padding:'14px 18px'}}>
+      {[0,1,2].map(i => (
+        <div key={i} style={{
+          width:8,height:8,borderRadius:'50%',background:'var(--mauve)',
+          animation:`pulse 1.2s ease-in-out ${i*0.2}s infinite`
+        }}/>
+      ))}
+    </div>
+  );
+}
+
+function AnswerCard({ item, voice, onQuiz }) {
+  const [speaking, setSpeaking] = useState(false);
+  const [copied, setCopied]     = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
+
+  const handleSpeak = () => {
+    if (speaking) { stopSpeak(); setSpeaking(false); return; }
+    setSpeaking(true);
+    speak(item.answer, voice);
+    setTimeout(() => setSpeaking(false), item.answer.length * 60);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(item.answer);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fadeUp" style={{
+      background:'var(--card)',
+      borderRadius:24,
+      padding:'24px',
+      boxShadow:'0 4px 24px rgba(193,124,143,.1)',
+      border:'1px solid rgba(242,196,206,.4)',
+      marginBottom:16,
+    }}>
+      {/* Question */}
+      <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:16}}>
+        <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,var(--blush),var(--lavender))',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0}}>✨</div>
+        <div style={{fontSize:14,fontWeight:500,color:'var(--text2)',fontFamily:'Playfair Display',fontStyle:'italic',lineHeight:1.5}}>{item.question}</div>
+      </div>
+
+      {/* Answer */}
+      <div style={{background:'rgba(253,246,240,.8)',borderRadius:16,padding:'16px',marginBottom:16,fontSize:14,lineHeight:1.8,color:'var(--text)'}}>
+        {item.answer}
+      </div>
+
+      {/* Tags */}
+      {item.tags && (
+        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
+          {item.tags.map((t,i) => (
+            <span key={t} style={{
+              background:TAG_COLORS[i%TAG_COLORS.length].bg,
+              color:TAG_COLORS[i%TAG_COLORS.length].text,
+              borderRadius:100,padding:'4px 12px',fontSize:11,fontWeight:500
+            }}>#{t}</span>
+          ))}
+        </div>
+      )}
+
+      {/* Videos */}
+      {item.videos && item.videos.length > 0 && (
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--text2)',letterSpacing:'1px',marginBottom:8}}>📺 WATCH & LEARN</div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {item.videos.map((v,i) => (
+              <a key={i} href={v.url} target="_blank" rel="noreferrer" style={{
+                display:'flex',alignItems:'center',gap:10,
+                background:'rgba(255,82,82,.06)',border:'1px solid rgba(255,82,82,.15)',
+                borderRadius:12,padding:'10px 14px',textDecoration:'none',
+              }}>
+                <span style={{fontSize:20}}>▶️</span>
+                <span style={{fontSize:13,color:'var(--text)',fontWeight:500}}>{v.title}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sources */}
+      {item.sources && item.sources.length > 0 && (
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--text2)',letterSpacing:'1px',marginBottom:8}}>🔗 SOURCES</div>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {item.sources.map((s,i) => (
+              <a key={i} href={s.url} target="_blank" rel="noreferrer" style={{
+                display:'flex',alignItems:'center',gap:8,
+                fontSize:12,color:'var(--mauve)',textDecoration:'none',fontWeight:500
+              }}>
+                <span>🌐</span>{s.title}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quiz */}
+      {showQuiz && item.quiz && (
+        <div style={{background:'rgba(212,197,232,.2)',borderRadius:16,padding:'16px',marginBottom:16}}>
+          <div style={{fontSize:12,fontWeight:600,color:'var(--mauve)',marginBottom:12}}>🧠 QUICK QUIZ</div>
+          {item.quiz.map((q,qi) => (
+            <div key={qi} style={{marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:500,marginBottom:8}}>{qi+1}. {q.q}</div>
+              {q.options.map((opt,oi) => (
+                <div key={oi} style={{fontSize:12,padding:'6px 12px',background:oi===q.ans?'rgba(184,201,176,.4)':'rgba(255,255,255,.6)',borderRadius:8,marginBottom:4,color:oi===q.ans?'#2e7d32':'var(--text)'}}>
+                  {oi===q.ans?'✅':''} {opt}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <button onClick={handleSpeak} style={{
+          display:'flex',alignItems:'center',gap:6,
+          background:speaking?'var(--mauve)':'rgba(242,196,206,.3)',
+          color:speaking?'#fff':'var(--mauve)',
+          border:`1px solid ${speaking?'var(--mauve)':'rgba(242,196,206,.6)'}`,
+          borderRadius:100,padding:'7px 14px',fontSize:12,fontWeight:500,
+        }}>
+          {speaking ? '⏹ Stop' : '🔊 Listen'}
+        </button>
+        <button onClick={handleCopy} style={{
+          display:'flex',alignItems:'center',gap:6,
+          background:'rgba(212,197,232,.3)',color:'#7b1fa2',
+          border:'1px solid rgba(212,197,232,.6)',
+          borderRadius:100,padding:'7px 14px',fontSize:12,fontWeight:500,
+        }}>
+          {copied ? '✅ Copied!' : '📋 Copy'}
+        </button>
+        {item.quiz && (
+          <button onClick={()=>setShowQuiz(!showQuiz)} style={{
+            display:'flex',alignItems:'center',gap:6,
+            background:'rgba(184,201,176,.3)',color:'#2e7d32',
+            border:'1px solid rgba(184,201,176,.6)',
+            borderRadius:100,padding:'7px 14px',fontSize:12,fontWeight:500,
+          }}>
+            🧠 {showQuiz?'Hide Quiz':'Take Quiz'}
+          </button>
+        )}
+        <button onClick={()=>{
+          const txt = `Q: ${item.question}\n\nA: ${item.answer}`;
+          if(navigator.share) navigator.share({text:txt});
+          else { navigator.clipboard.writeText(txt); }
+        }} style={{
+          display:'flex',alignItems:'center',gap:6,
+          background:'rgba(245,203,167,.3)',color:'#e65100',
+          border:'1px solid rgba(245,203,167,.6)',
+          borderRadius:100,padding:'7px 14px',fontSize:12,fontWeight:500,
+        }}>
+          📤 Share
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GoodyAI() {
+  const [query, setQuery]       = useState('');
+  const [history, setHistory]   = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [voice, setVoice]       = useState(VOICES[0]);
+  const [mode, setMode]         = useState(MODES[0]);
+  const [lang, setLang]         = useState(LANGS[0]);
+  const [darkMode, setDarkMode] = useState(false);
+  const [screen, setScreen]     = useState('home');
+  const inputRef = useRef();
+
+  const getMockAnswer = (q) => {
+    const answers = {
+      default: `Great question! ${q} is a fascinating topic. Here's what you need to know:\n\nThis concept has been studied extensively and involves multiple interesting aspects. The key thing to understand is that it connects to many areas of knowledge that are relevant in today's world.\n\nIn simple terms, it refers to a system or idea that helps us understand the world better. Researchers and experts have found that understanding this topic can open many doors in both academic and professional life.\n\nThe most important takeaway is to keep exploring and learning — curiosity is your greatest tool! 🌸`
+    };
+    return answers.default;
+  };
+
+  const getMockData = (q) => ({
+    question: q,
+    answer: getMockAnswer(q),
+    tags: ['learning', 'knowledge', 'explore', 'growth'],
+    videos: [
+      { title: `${q} explained simply`, url: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` },
+      { title: `Deep dive into ${q}`, url: `https://www.youtube.com/results?search_query=${encodeURIComponent(q+' explained')}` },
+    ],
+    sources: [
+      { title: `Wikipedia: ${q}`, url: `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(q)}` },
+      { title: `Learn more on Google`, url: `https://www.google.com/search?q=${encodeURIComponent(q)}` },
+    ],
+    quiz: [
+      { q: `Which best describes ${q.split(' ').slice(0,3).join(' ')}?`, options: ['A concept in science', 'A type of art', 'A form of music', 'A cooking method'], ans: 0 },
+      { q: `Why is this topic important?`, options: ['It is not important', 'It helps us understand the world', 'Only experts need it', 'It is outdated'], ans: 1 },
+    ]
+  });
+
+  const handleAsk = async () => {
+    if (!query.trim()) return;
+    const q = query.trim();
+    setQuery('');
+    setLoading(true);
+    setScreen('chat');
+
+    await new Promise(r => setTimeout(r, 1800));
+
+    const result = getMockData(q);
+    setHistory(h => [result, ...h]);
+    setLoading(false);
+  };
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAsk(); }
+  };
+
+  // SETTINGS PANEL
+  const Settings = () => (
+    <div style={{background:'var(--card)',borderRadius:24,padding:20,marginBottom:16,border:'1px solid rgba(242,196,206,.4)',boxShadow:'0 4px 20px rgba(193,124,143,.08)'}}>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--text2)',letterSpacing:'1px',marginBottom:12}}>🎀 CUSTOMIZE</div>
+
+      {/* Voice */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:11,color:'var(--text2)',marginBottom:6}}>Voice Style</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+          {VOICES.map(v => (
+            <button key={v.id} onClick={()=>setVoice(v)} style={{
+              padding:'6px 12px',borderRadius:100,fontSize:11,fontWeight:500,border:'none',
+              background:voice.id===v.id?'var(--mauve)':'rgba(242,196,206,.3)',
+              color:voice.id===v.id?'#fff':'var(--text2)',
+            }}>{v.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Mode */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:11,color:'var(--text2)',marginBottom:6}}>Answer Mode</div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {MODES.map(m => (
+            <button key={m.id} onClick={()=>setMode(m)} style={{
+              padding:'6px 12px',borderRadius:100,fontSize:11,fontWeight:500,border:'none',
+              background:mode.id===m.id?'var(--mauve)':'rgba(212,197,232,.3)',
+              color:mode.id===m.id?'#fff':'var(--text2)',
+            }}>{m.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Language */}
+      <div>
+        <div style={{fontSize:11,color:'var(--text2)',marginBottom:6}}>Language</div>
+        <div style={{display:'flex',gap:6}}>
+          {LANGS.map(l => (
+            <button key={l.id} onClick={()=>setLang(l)} style={{
+              padding:'6px 12px',borderRadius:100,fontSize:11,fontWeight:500,border:'none',
+              background:lang.id===l.id?'var(--mauve)':'rgba(184,201,176,.3)',
+              color:lang.id===l.id?'#fff':'var(--text2)',
+            }}>{l.label}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:'100vh',maxWidth:680,margin:'0 auto',padding:'0 16px 120px'}}>
+
+      {/* Header */}
+      <div style={{padding:'24px 0 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>
+          <div style={{fontFamily:'Playfair Display',fontSize:28,fontWeight:700,color:'var(--text)',letterSpacing:'-0.5px'}}>
+            Goody<span style={{color:'var(--mauve)'}}>.ai</span>
+          </div>
+          <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>Ask anything. Learn beautifully. ✨</div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          {history.length > 0 && (
+            <button onClick={()=>setScreen(screen==='settings'?'chat':'settings')} style={{
+              width:36,height:36,borderRadius:'50%',border:'none',
+              background:'rgba(212,197,232,.4)',fontSize:16,
+            }}>⚙️</button>
+          )}
+          <button onClick={()=>{setHistory([]);setScreen('home')}} style={{
+            width:36,height:36,borderRadius:'50%',border:'none',
+            background:'rgba(242,196,206,.4)',fontSize:16,
+          }}>🏠</button>
+        </div>
+      </div>
+
+      {/* Home Screen */}
+      {screen === 'home' && (
+        <div className="fadeUp">
+          {/* Hero */}
+          <div style={{textAlign:'center',padding:'32px 0 24px'}}>
+            <div className="float" style={{fontSize:56,marginBottom:16}}>🌸</div>
+            <h1 style={{fontFamily:'Playfair Display',fontSize:'clamp(28px,6vw,42px)',fontWeight:700,lineHeight:1.2,marginBottom:12,color:'var(--text)'}}>
+              Your aesthetic<br/>
+              <span style={{background:'linear-gradient(135deg,var(--mauve),var(--lavender))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
+                knowledge bestie
+              </span>
+            </h1>
+            <p style={{fontSize:14,color:'var(--text2)',lineHeight:1.7,maxWidth:340,margin:'0 auto'}}>
+              Ask anything. Get beautiful answers with videos, sources, voice and quizzes. 💕
+            </p>
+          </div>
+
+          {/* Suggestions */}
+          <div style={{marginBottom:24}}>
+            <div style={{fontSize:11,fontWeight:600,color:'var(--text2)',letterSpacing:'1px',marginBottom:12,textAlign:'center'}}>✨ TRY ASKING</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              {SUGGESTIONS.map((s,i) => (
+                <button key={i} onClick={()=>{setQuery(s);setTimeout(()=>inputRef.current?.focus(),100)}} style={{
+                  background:'var(--card)',border:'1px solid rgba(242,196,206,.5)',
+                  borderRadius:16,padding:'12px 14px',fontSize:12,color:'var(--text)',
+                  textAlign:'left',lineHeight:1.4,
+                  boxShadow:'0 2px 12px rgba(193,124,143,.07)',
+                  animationDelay:`${i*0.08}s`,
+                }} className="fadeUp">
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Settings />
+        </div>
+      )}
+
+      {/* Settings Screen */}
+      {screen === 'settings' && <Settings />}
+
+      {/* Chat History */}
+      {screen === 'chat' && (
+        <div>
+          {loading && (
+            <div style={{background:'var(--card)',borderRadius:24,padding:'8px 16px',marginBottom:16,border:'1px solid rgba(242,196,206,.4)',display:'inline-block'}}>
+              <TypingDots />
+            </div>
+          )}
+          {history.map((item, i) => (
+            <AnswerCard key={i} item={item} voice={voice} />
+          ))}
+        </div>
+      )}
+
+      {/* Input Bar */}
+      <div style={{
+        position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',
+        width:'100%',maxWidth:680,padding:'16px',
+        background:'linear-gradient(to top,var(--cream) 70%,transparent)',
+        zIndex:100,
+      }}>
+        <div style={{
+          display:'flex',gap:10,alignItems:'flex-end',
+          background:'var(--card)',borderRadius:20,
+          padding:'12px 14px',
+          boxShadow:'0 8px 32px rgba(193,124,143,.18)',
+          border:'1px solid rgba(242,196,206,.5)',
+        }}>
+          <textarea
+            ref={inputRef}
+            value={query}
+            onChange={e=>setQuery(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Ask me anything beautiful... 🌸"
+            rows={1}
+            style={{
+              flex:1,border:'none',background:'transparent',
+              fontSize:14,color:'var(--text)',resize:'none',
+              fontFamily:'DM Sans',lineHeight:1.5,maxHeight:100,
+              '::placeholder':{color:'var(--text2)'},
+            }}
+          />
+          <button
+            onClick={handleAsk}
+            disabled={!query.trim() || loading}
+            style={{
+              width:40,height:40,borderRadius:'50%',border:'none',flexShrink:0,
+              background:query.trim()?'linear-gradient(135deg,var(--mauve),var(--lavender))':'rgba(242,196,206,.4)',
+              color:query.trim()?'#fff':'var(--text2)',fontSize:18,
+              display:'flex',alignItems:'center',justifyContent:'center',
+              transition:'all .2s',
+            }}
+          >
+            {loading ? <div style={{width:16,height:16,border:'2px solid #fff',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/> : '✨'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<GoodyAI />);
+</script>
+</body>
+</html>
